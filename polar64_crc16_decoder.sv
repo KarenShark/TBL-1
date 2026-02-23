@@ -22,19 +22,57 @@ module polar64_crc16_decoder (
   output logic        valid
 );
 
-  logic       busy;
-  logic [1:0] cnt;           // we also finish at start+2 cycles
-  logic [23:0] data_reg;
-  logic        valid_reg;
+  import crc_pkg::*;
 
-  assign data_out = data_reg;
-  assign valid    = valid_reg;
+  // ------------------------------------------------------------
+  // Local Constants & Helpers (Self-contained for robustness)
+  // ------------------------------------------------------------
+  localparam int unsigned K_INFO = 40;
+  localparam int unsigned K_DATA = 24;
+  localparam int unsigned K_CRC  = 16;
+  localparam int unsigned K_FRZ  = 24;
 
-  // A small packed "return type" for internal decoding helpers
+  localparam int unsigned INFO_POS [0:39] = '{
+    13,14,15,19,21,22,23,25,26,27,
+    28,29,30,31,35,37,38,39,41,42,
+    43,44,45,46,47,49,50,51,52,53,
+    54,55,56,57,58,59,60,61,62,63
+  };
+
+  localparam int unsigned FROZEN_POS [0:23] = '{
+    0,1,2,3,4,5,6,7,8,9,10,11,
+    12,16,17,18,20,24,32,33,34,36,40,48
+  };
+
+  function automatic logic [63:0] polar_transform64(input logic [63:0] u);
+    logic [63:0] v;
+    int s, i, j, step, half;
+    v = u;
+    for (s = 0; s <= 5; s++) begin
+      step = 1 << (s + 1);
+      half = 1 << s;
+      for (i = 0; i < 64; i += step)
+        for (j = 0; j < half; j++)
+          v[i+j] = v[i+j] ^ v[i+j+half];
+    end
+    return v;
+  endfunction
+
+
+  // decode result struct: ok=valid, data=24-bit payload
   typedef struct packed {
     logic        ok;
     logic [23:0] data;
   } dec_result_t;
+
+  logic        busy;
+  logic [1:0]  cnt;
+  logic [23:0] data_reg;
+  logic        valid_reg;
+  dec_result_t r_comb;       // combinational decode of current rx
+
+  assign data_out = data_reg;
+  assign valid    = valid_reg;
 
   // Check if a 64-bit candidate is a valid codeword under:
   // 1) frozen bits are all 0 in u_hat
@@ -151,9 +189,10 @@ module polar64_crc16_decoder (
     end
   endfunction
 
-  // Control/timing:
-  // - latch result at start
-  // - pulse done exactly at start+2 (<=12 requirement satisfied)
+  // continuously compute decode; sampled into FFs when start fires
+  always_comb r_comb = decode_bd3(rx);
+
+  // done pulses exactly at start+2 cycles (satisfies <=12 requirement)
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       done      <= 1'b0;
@@ -165,16 +204,12 @@ module polar64_crc16_decoder (
       done <= 1'b0;
 
       if (start && !busy) begin
-        dec_result_t r;
-        r         = decode_bd3(rx);
-        data_reg  <= r.data;
-        valid_reg <= r.ok;
-
-        busy <= 1'b1;
-        cnt  <= 2;        // done after 2 cycles (fast + deterministic)
+        data_reg  <= r_comb.data;
+        valid_reg <= r_comb.ok;
+        busy      <= 1'b1;
+        cnt       <= 2;
       end else if (busy) begin
         if (cnt != 0) cnt <= cnt - 1;
-
         if (cnt == 1) begin
           done <= 1'b1;
           busy <= 1'b0;

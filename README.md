@@ -16,8 +16,8 @@ xsim sim_snapshot -runall
 
 | Module | Latency | Description |
 |--------|---------|-------------|
-| polar64_crc16_encoder | done @ +2 cycles | CRC-16-CCITT (crc.sv) + build u[INFO_POS] + polar butterfly transform |
-| polar64_crc16_decoder | done ≤12 cycles | Bounded-distance radius=3 mask search + frozen-bit check + CRC verify |
+| polar64_crc16_encoder | done @ +2 cycles | (1) CRC-16-CCITT on data_in[23:0] via crc.sv; (2) build u[63:0] with data at INFO_POS[0..23], CRC at INFO_POS[24..39], frozen=0; (3) polar butterfly transform (no bit-reversal) |
+| polar64_crc16_decoder | done ≤12 cycles | (1) Search all masks with Hamming weight 0..3; (2) for each candidate rx^mask, inverse polar → u_hat, check frozen bits=0; (3) extract data+CRC from u_hat, verify CRC; (4) unique hit → valid=1 else valid=0 |
 
 ## Division of Labor
 

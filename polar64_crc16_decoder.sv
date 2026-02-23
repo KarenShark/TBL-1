@@ -22,8 +22,6 @@ module polar64_crc16_decoder (
   output logic        valid
 );
 
-  import polar_common_pkg::*;
-
   logic       busy;
   logic [1:0] cnt;           // we also finish at start+2 cycles
   logic [23:0] data_reg;

@@ -12,6 +12,8 @@
 
 `timescale 1ns/1ps
 
+import polar_common_pkg::*;
+
 module polar64_crc16_decoder (
   input  logic        clk,
   input  logic        rst_n,
@@ -21,43 +23,6 @@ module polar64_crc16_decoder (
   output logic [23:0] data_out,
   output logic        valid
 );
-
-  import crc_pkg::*;
-
-  // ------------------------------------------------------------
-  // Local Constants & Helpers (Self-contained for robustness)
-  // ------------------------------------------------------------
-  localparam int unsigned K_INFO = 40;
-  localparam int unsigned K_DATA = 24;
-  localparam int unsigned K_CRC  = 16;
-  localparam int unsigned K_FRZ  = 24;
-
-  localparam int unsigned INFO_POS [0:39] = '{
-    13,14,15,19,21,22,23,25,26,27,
-    28,29,30,31,35,37,38,39,41,42,
-    43,44,45,46,47,49,50,51,52,53,
-    54,55,56,57,58,59,60,61,62,63
-  };
-
-  localparam int unsigned FROZEN_POS [0:23] = '{
-    0,1,2,3,4,5,6,7,8,9,10,11,
-    12,16,17,18,20,24,32,33,34,36,40,48
-  };
-
-  function automatic logic [63:0] polar_transform64(input logic [63:0] u);
-    logic [63:0] v;
-    int s, i, j, step, half;
-    v = u;
-    for (s = 0; s <= 5; s++) begin
-      step = 1 << (s + 1);
-      half = 1 << s;
-      for (i = 0; i < 64; i += step)
-        for (j = 0; j < half; j++)
-          v[i+j] = v[i+j] ^ v[i+j+half];
-    end
-    return v;
-  endfunction
-
 
   // decode result struct: ok=valid, data=24-bit payload
   typedef struct packed {
@@ -92,7 +57,7 @@ module polar64_crc16_decoder (
       u_hat = polar_transform64(cand_cw);
 
       // Frozen-bit constraint: all frozen positions must be 0
-      for (k = 0; k < K_FRZ; k++) begin
+      for (k = 0; k < N_FROZEN; k++) begin
         if (u_hat[FROZEN_POS[k]] != 1'b0) begin
           return r; // fail fast
         end

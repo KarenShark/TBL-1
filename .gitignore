@@ -1,0 +1,16 @@
+# Excluded as per requirements
+Report.pdf
+ai_log.txt
+tbl1_handout.pdf
+
+# Vivado / xsim artifacts
+xsim.dir/
+*.log
+*.jou
+*.pb
+*.vcd
+sim_snapshot/
+sim_snapshot_ext/
+
+# OS artifacts
+.DS_Store

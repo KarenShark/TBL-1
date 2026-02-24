@@ -21,6 +21,8 @@
 
 module tb_basic;
 
+  import polar_common_pkg::*;
+
   logic clk;
   logic rst_n;
 
